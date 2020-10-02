@@ -9,7 +9,6 @@ wb = xlrd.open_workbook("docs/Demo_Assessment_Model_08.18.20.xlsx")
 sheet = wb.sheet_by_name("KPI Dashboard")
 last_col = sheet.ncols - 1
 last_row = sheet.nrows - 1
-print(last_row)
 
 
 def get_date(d):
@@ -28,8 +27,8 @@ def is_category(idx):
     return True if get_date(sheet.cell_value(idx, 3)) else False
 
 
-def has_sub(cell):
-    col_b_value = sheet.cell_value(index, 1)
+def has_sub(idx):
+    col_b_value = sheet.cell_value(idx, 1)
     if col_b_value != "":
         return col_b_value
     else:
@@ -42,7 +41,6 @@ def get_fields(index):
     index = index + 1
     while(index != last_row):
         cell_value = sheet.cell_value(index, 2)
-        print(cell_value)
         if is_category(index) is True:
             break
         elif cell_value != "":
@@ -61,13 +59,14 @@ for index, value in enumerate(sheet.col_values(2)):
             temp = {
                 "name": value,
                 "fields": get_fields(index),
-                "subsets": ["all"],
+                "subsets": [["all", index]],
                 "start_date": get_date(sheet.cell_value(index, 3)),
-                "end_date": get_date(sheet.cell_value(index, last_col))
+                "end_date": get_date(sheet.cell_value(index, last_col)),
+                "data": []
             }
-        col_b_value = has_sub(value)
+        col_b_value = has_sub(index)
         if col_b_value:
-            temp["subsets"].append(col_b_value)
+            temp["subsets"].append([col_b_value, index])
         category_schema.append(temp)
 
 pprint(category_schema)
