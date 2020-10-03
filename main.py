@@ -1,4 +1,5 @@
 from datetime import datetime
+from calendar import monthrange
 import sys
 
 import xlrd
@@ -13,10 +14,11 @@ last_row = sheet.nrows - 1
 
 def get_date(d):
     try:
-        date = datetime(*xlrd.xldate_as_tuple(d, wb.datemode))\
-            .strftime("%Y-%m-%d %H:%M:%S")
-        datetime.strptime(date, "%Y-%m-31 00:00:00")
-        return date
+        excel_date = datetime(*xlrd.xldate_as_tuple(d, wb.datemode))
+        converted_date = excel_date.strftime("%Y-%m-%dT%H:%M:%S.000+00:00")
+        datetime.strptime(
+            converted_date, f"%Y-%m-{monthrange(excel_date.year, excel_date.month)[1]}T00:00:00.000+00:00")
+        return converted_date
     except ValueError:
         return False
     except TypeError:
@@ -68,6 +70,25 @@ for index, value in enumerate(sheet.col_values(2)):
         if col_b_value:
             temp["subsets"].append([col_b_value, index])
         category_schema.append(temp)
+
+for category in category_schema:
+    for column in range(3, last_col):
+        date_row = sheet.cell_value(category["subsets"][0][1], column)
+        temp = {
+            "date": get_date(date_row),
+            "values": [],
+        }
+        for index, field in enumerate(category["fields"]):
+            temp_values = []
+            for subset in category['subsets']:
+                temp_values.append({
+                    "name": field,
+                    "subset": subset[0],
+                    "value": sheet.cell_value(subset[1] + 1, column)
+                })
+                temp["values"].append(temp_values)
+
+        category["data"].append(temp)
 
 pprint(category_schema)
 
