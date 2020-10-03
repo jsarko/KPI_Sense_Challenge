@@ -98,7 +98,7 @@ class Read_WB:
                                 "subset": subset[0],
                                 "value": self.sheet.cell_value(subset[1] + 1, column)
                             })
-                            temp["values"].append(temp_values)
+                        temp["values"].append(temp_values)
 
                     category["data"].append(temp)
             for category in category_schema:
