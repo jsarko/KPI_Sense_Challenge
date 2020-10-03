@@ -16,19 +16,15 @@ class Read_WB:
 
     def get_date(self, d, is_first_of_month=False):
         try:
-            self.excel_date = datetime(
-                *xlrd.xldate_as_tuple(d, self.wb.datemode))
-            if is_first_of_month:
-                day = "01"
-            else:
-                day = monthrange(self.excel_date.year,
-                                 self.excel_date.month)[1]
-            self.converted_date = self.excel_date.strftime(
-                f"%Y-%m-{day}T%H:%M:%S.000+00:00")
+            excel_date = datetime(*xlrd.xldate_as_tuple(d, self.wb.datemode))
+            converted_date = excel_date.strftime("%Y-%m-%dT%H:%M:%S.000+00:00")
             datetime.strptime(
-                self.converted_date, f"%Y-%m-{day}T00:00:00.000+00:00")
-            return self.converted_date
-        except ValueError as ve:
+                converted_date, f"%Y-%m-{monthrange(excel_date.year, excel_date.month)[1]}T00:00:00.000+00:00")
+            if is_first_of_month:
+                return excel_date.strftime("%Y-%m-01T%H:%M:%S.000+00:00")
+            else:
+                return converted_date
+        except ValueError:
             return False
         except TypeError:
             return False
@@ -51,37 +47,68 @@ class Read_WB:
             elif cell_value != "":
                 fields.append(cell_value.strip())
             index = index + 1
-
         return fields
 
     def is_category(self, idx):
         return True if self.get_date(self.sheet.cell_value(idx, 3)) else False
 
     def tests(self):
-        print(self.is_category(3))
-        print(self.get_date(43010.0))
+        def test_dates():
+            assert self.get_date(
+                43131.0, is_first_of_month=True) is not False, "Should be a date"
+        test_dates()
 
     def parse_data(self):
-        category_schema = []
-        for index, value in enumerate(self.sheet.col_values(2)):
-            temp = next(
-                (item for item in category_schema if item['name'] == value), None)
-            if self.is_category(index):
-                if temp is None:
+        def get_category_schema():
+            category_schema = []
+            for index, value in enumerate(self.sheet.col_values(2)):
+                temp = next(
+                    (item for item in category_schema if item['name'] == value), None)
+                if self.is_category(index):
+                    if temp is None:
+                        temp = {
+                            "name": value,
+                            "fields": self.get_fields(index),
+                            "subsets": [["All", index]],
+                            "start_date": self.get_date(self.sheet.cell_value(index, 3), is_first_of_month=True),
+                            "end_date": self.get_date(self.sheet.cell_value(index, self.last_col)),
+                            "data": []
+                        }
+                        category_schema.append(temp)
+                    else:
+                        col_b_value = self.has_sub(index)
+                        if col_b_value:
+                            temp["subsets"].append([col_b_value, index])
+            return category_schema
+
+        def parse_category_values(category_schema):
+            for category in category_schema:
+                for column in range(3, self.last_col):
+                    date_row = self.sheet.cell_value(
+                        category["subsets"][0][1], column)
                     temp = {
-                        "name": value,
-                        "fields": self.get_fields(index),
-                        "subsets": [["All", index]],
-                        "start_date": self.get_date(self.sheet.cell_value(index, 3), is_first_of_month=True),
-                        "end_date": self.get_date(self.sheet.cell_value(index, self.last_col)),
-                        "data": []
+                        "date": self.get_date(date_row),
+                        "values": [],
                     }
-                    category_schema.append(temp)
-                else:
-                    col_b_value = self.has_sub(index)
-                    if col_b_value:
-                        temp["subsets"].append([col_b_value, index])
-        return category_schema
+                    for field in category["fields"]:
+                        temp_values = []
+                        for subset in category['subsets']:
+                            temp_values.append({
+                                "name": field,
+                                "subset": subset[0],
+                                "value": self.sheet.cell_value(subset[1] + 1, column)
+                            })
+                            temp["values"].append(temp_values)
+
+                    category["data"].append(temp)
+            for category in category_schema:
+                category["subsets"] = [subset[0]
+                                       for subset in category["subsets"]]
+            return category_schema
+
+        category_schema = get_category_schema()
+        data = parse_category_values(category_schema)
+        return data
 
 
 if __name__ == "__main__":
