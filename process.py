@@ -1,12 +1,13 @@
 from datetime import datetime
 from calendar import monthrange
-import sys
+from pprint import pprint
+import os
+import json
 
 import xlrd
-from pprint import pprint
 
 
-class Read_WB:
+class Parse_WB:
     def __init__(self):
         self.wb = xlrd.open_workbook(
             "docs/Demo_Assessment_Model_08.18.20.xlsx")
@@ -15,6 +16,11 @@ class Read_WB:
         self.last_row = self. sheet.nrows - 1
 
     def get_date(self, d, is_first_of_month=False):
+        """This function checks that the serialized dates read from the excel file are
+            an actual date and not a fake date parsed from raw values. It does this by verifying the
+            format is YYYY-mm-ddTHH:MM:SS.s+z and that the day is either the first or last of the month,
+            whichever the function specified.
+        """
         try:
             excel_date = datetime(*xlrd.xldate_as_tuple(d, self.wb.datemode))
             converted_date = excel_date.strftime("%Y-%m-%dT%H:%M:%S.000+00:00")
@@ -52,11 +58,22 @@ class Read_WB:
     def is_category(self, idx):
         return True if self.get_date(self.sheet.cell_value(idx, 3)) else False
 
-    def tests(self):
-        def test_dates():
-            assert self.get_date(
-                43131.0, is_first_of_month=True) is not False, "Should be a date"
-        test_dates()
+    def run_tests(self, test_to_run):
+        def test_date_function():
+            serialized_dates = [34787, 34762, 37801, 37632, 40772, 39242, 37992, 41863,
+                                42793, 33109, 43438, 32231, 43986, 38556, 43562, 34214, 37494,
+                                41911, 42291, 41927, 41317, 32297, 34495, 33205, 33317, 40457,
+                                38007, 36729, 33153, 39041, 39022]
+            for date in serialized_dates:
+                assert self.get_date(
+                    date, is_first_of_month=False) is False, f"{date} should have returned False."
+                print(f"Serialized value {date} passed.")
+        if test_to_run == "1":
+            print("This is to test whether the function 'get_date()' correctly parses serialized"
+                  "dates to a proper datetime AND that it matches the format of: YYYY-mm-ddTHH:MM:SS.s+z"
+                  "and that the day is either the first or last of the month.\r\n")
+            input("Press enter to continue.")
+            test_date_function()
 
     def parse_data(self):
         def get_category_schema():
@@ -112,5 +129,62 @@ class Read_WB:
 
 
 if __name__ == "__main__":
-    d = Read_WB().parse_data()
-    print(d)
+    print("\r\nWelcome!\r\n")
+
+    def run_program():
+        def get_mode_choice():
+            print("Please choose one of the following options:")
+            choice = input(
+                "1. Parse data from default document.\r\n2. Run tests.\r\n")
+            if choice not in ["1", "2"]:
+                print("\r\n***Whoops!***")
+                print(f"\r\n{choice} is not a valid option, please try again.")
+                return get_mode_choice()
+            return choice
+
+        def get_test_choice():
+            print("Which test would you like to run?\r\n")
+            choice = input("1. Test Date Parse Function\r\n")
+            if choice not in ["1", "2"]:
+                print("\r\n***Whoops!***")
+                print(f"\r\n{choice} is not a valid option, please try again.")
+                return get_test_choice()
+            return choice
+
+        def get_parse_choice():
+            print("Would you like to:\r\n")
+            choice = input(
+                "1. Print data to console\r\n2. Output to JSON\r\n3. Do both\r\n")
+            if choice not in ["1", "2", "3"]:
+                print("Please pick a valid choice\r\n")
+                return get_parse_choice()
+            return choice
+
+        def output_to_json(data):
+            loc = "data.json"
+            with open(loc, "w") as output_file:
+                json.dump(data, output_file, indent=4)
+                output_file.close()
+            print(f"File saved to: {os.path.abspath(loc)}")
+
+        mode_choice = get_mode_choice()
+        if mode_choice == "1":
+            parse_choice = get_parse_choice()
+            data = Parse_WB().parse_data()
+            if parse_choice == "1":
+                pprint(data)
+            elif parse_choice == "2":
+                output_to_json(data)
+            else:
+                pprint(data)
+                output_to_json(data)
+        elif mode_choice == "2":
+            test_choice = get_test_choice()
+            Parse_WB().run_tests(test_choice)
+
+        run_again = input(
+            "Would you like to run the program again? Y or N? ").upper()
+        if run_again in "YES":
+            return run_program()
+
+    run_program()
